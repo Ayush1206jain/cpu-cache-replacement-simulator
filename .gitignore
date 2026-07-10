@@ -1,0 +1,8 @@
+# Personal study notes — not for public repo
+daily Progress/
+
+# Build artifacts
+*.exe
+*.o
+simulator
+test_lru
