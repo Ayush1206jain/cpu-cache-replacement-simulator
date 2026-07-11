@@ -1,116 +1,194 @@
 /*
- * main.c — Entry point for CPU Cache Replacement Simulator
+ * main.c — CPU Cache Replacement Simulator
  *
- * Day 4: Demonstrates LRU cache with the plan's test sequence.
- * Future days will add FIFO, LFU, PLRU, and trace-driven simulation.
+ * Day 5: Demonstrates LRU, FIFO, and LFU policies side-by-side.
+ * Uses the unified Cache interface introduced today.
  *
  * Build:
- *   gcc -Wall -Wextra -o simulator src/main.c src/cache/lru.c -I src/cache
+ *   gcc -Wall -Wextra -std=c11 -O2 -o simulator \
+ *       src/main.c src/cache/lru.c src/cache/fifo.c \
+ *       src/cache/lfu.c src/cache/cache.c -Isrc/cache
  * Run:
  *   ./simulator
- *
- * Day 4 — CPU Cache Replacement Simulator
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include "lru.h"
+#include <string.h>
+#include "cache.h"
 
-/* ─── Demo: Plan's test sequence ──────────────────────────────────── */
-static void demo_lru_plan_sequence(void)
+/* ─── Helper: run a named access sequence on a cache ─────────────── */
+static void run_sequence(Cache *c, const char **labels,
+                         const uint64_t *addrs, int n)
 {
-    printf("\n╔══════════════════════════════════════════╗\n");
-    printf("║  LRU Demo — Plan sequence [A,B,C,A,D,B] ║\n");
-    printf("║  Capacity: 3                              ║\n");
-    printf("╚══════════════════════════════════════════╝\n\n");
-
-    /* Addresses: A=1, B=2, C=3, D=4 for readability */
-    struct { uint64_t addr; const char *label; } sequence[] = {
-        {1, "A"}, {2, "B"}, {3, "C"},
-        {1, "A"}, {4, "D"}, {2, "B"},
-    };
-    int n = sizeof(sequence) / sizeof(sequence[0]);
-
-    LRUCache *cache = lru_create(3);
-    if (!cache) { fprintf(stderr, "Failed to create cache\n"); return; }
-
-    printf("%-8s %-10s %-12s %s\n", "Step", "Address", "Result", "Cache State (MRU→LRU)");
-    printf("──────────────────────────────────────────────────────────\n");
+    printf("\n%-6s | %-8s | %-12s | %s\n",
+           "Step", "Addr", "Result", "Policy");
+    printf("──────────────────────────────────────\n");
 
     for (int i = 0; i < n; i++) {
-        int result = lru_access(cache, sequence[i].addr);
-
-        printf("%-8d %-10s %-12s [",
+        int r = cache_access(c, addrs[i]);
+        printf("%-6d | %-8s | %-12s | %s\n",
                i + 1,
-               sequence[i].label,
-               result == CACHE_HIT ? "HIT ✓" : "MISS ✗");
-
-        /* Print cache state MRU → LRU */
-        LRUNode *cur = cache->head;
-        int first = 1;
-        while (cur) {
-            /* Convert address back to letter */
-            char lbl = (char)('A' + (int)cur->address - 1);
-            if (!first) printf(", ");
-            printf("%c", lbl);
-            first = 0;
-            cur = cur->next;
-        }
-        printf("]\n");
+               labels[i],
+               r == CACHE_HIT ? "HIT  ✓" : "MISS ✗",
+               c->policy_name);
     }
-
-    printf("\n");
-    lru_print_stats(cache);
-    lru_destroy(cache);
 }
 
-/* ─── Demo: Sequential vs repeated access pattern ─────────────────── */
-static void demo_locality(void)
+/* ─── Demo 1: Same sequence across all 3 policies ─────────────────── */
+static void demo_policy_comparison(void)
 {
-    printf("\n╔═════════════════════════════════════════════╗\n");
-    printf("║  LRU Demo — Temporal locality effect        ║\n");
-    printf("║  Access hot working set repeatedly (cap=4) ║\n");
-    printf("╚═════════════════════════════════════════════╝\n\n");
+    printf("\n╔═══════════════════════════════════════════════════════╗\n");
+    printf("║  Demo 1: LRU vs FIFO vs LFU on [A,B,C,A,D,B] cap=3  ║\n");
+    printf("╚═══════════════════════════════════════════════════════╝\n");
 
-    LRUCache *cache = lru_create(4);
-    if (!cache) return;
+    const char    *labels[] = {"A","B","C","A","D","B"};
+    const uint64_t addrs[]  = { 1,  2,  3,  1,  4,  2};
+    int n = 6;
 
-    uint64_t hot_set[] = {0x100, 0x200, 0x300, 0x400};
-    int passes = 5;
+    const char *policies[] = {"LRU", "FIFO", "LFU"};
 
-    printf("Hot working set: 0x100, 0x200, 0x300, 0x400 (fits in cache)\n");
-    printf("Accessing %d times each...\n\n", passes);
+    printf("\n%-8s | %-5s | %-5s | %s\n",
+           "Policy", "Hits", "Miss", "Hit Rate");
+    printf("──────────────────────────────────\n");
 
-    for (int p = 0; p < passes; p++) {
-        for (int i = 0; i < 4; i++) {
-            int r = lru_access(cache, hot_set[i]);
-            printf("  Pass %d | 0x%llx → %s\n",
-                   p + 1,
-                   (unsigned long long)hot_set[i],
-                   r == CACHE_HIT ? "HIT" : "MISS (cold miss, first access)");
-        }
+    for (int p = 0; p < 3; p++) {
+        Cache *c = cache_create(3, policies[p]);
+
+        int hits = 0, total = n;
+        for (int i = 0; i < n; i++)
+            if (cache_access(c, addrs[i]) == CACHE_HIT) hits++;
+
+        printf("%-8s | %-5d | %-5d | %.2f%%\n",
+               policies[p], hits, total - hits,
+               100.0 * hits / total);
+        cache_destroy(c);
     }
 
-    printf("\n");
-    lru_print_stats(cache);
-    lru_destroy(cache);
+    /* Now print step-by-step for each policy */
+    for (int p = 0; p < 3; p++) {
+        Cache *c = cache_create(3, policies[p]);
+        printf("\n── %s ────────────────────────────────", policies[p]);
+        run_sequence(c, labels, addrs, n);
+        cache_print_stats(c);
+        cache_destroy(c);
+    }
+}
+
+/* ─── Demo 2: LFU cache pollution ─────────────────────────────────── */
+static void demo_lfu_pollution(void)
+{
+    printf("\n╔═══════════════════════════════════════════════════════╗\n");
+    printf("║  Demo 2: LFU Cache Pollution                          ║\n");
+    printf("║  Hot item A (freq=10) blocks new items from cache     ║\n");
+    printf("╚═══════════════════════════════════════════════════════╝\n\n");
+
+    Cache *lru = cache_create(3, "LRU");
+    Cache *lfu = cache_create(3, "LFU");
+
+    /* Phase 1: make A hot in both caches */
+    printf("Phase 1: Access A ten times (make it 'hot')\n");
+    for (int i = 0; i < 10; i++) {
+        cache_access(lru, 0xA);
+        cache_access(lfu, 0xA);
+    }
+
+    /* Phase 2: fill with B and C */
+    printf("Phase 2: Load B and C\n");
+    cache_access(lru, 0xB); cache_access(lfu, 0xB);
+    cache_access(lru, 0xC); cache_access(lfu, 0xC);
+
+    /* Phase 3: now A is "cold" — access D, E, F */
+    printf("Phase 3: Access D, E, F (A is no longer needed)\n\n");
+
+    const uint64_t new_data[] = {0xD, 0xE, 0xF};
+    const char    *nd_labels[] = {"D", "E", "F"};
+
+    printf("%-6s | %-4s %-8s | %-4s %-8s\n",
+           "Addr", "LRU", "Result", "LFU", "Result");
+    printf("──────────────────────────────────────────────\n");
+
+    for (int i = 0; i < 3; i++) {
+        int rl = cache_access(lru, new_data[i]);
+        int rf = cache_access(lfu, new_data[i]);
+        printf("  %-4s | %-4s %-8s | %-4s %-8s\n",
+               nd_labels[i],
+               "LRU:", rl == CACHE_HIT ? "HIT" : "MISS",
+               "LFU:", rf == CACHE_HIT ? "HIT" : "MISS");
+    }
+
+    printf("\nFinal cache contents:\n");
+    printf("LRU → "); cache_print(lru);
+    printf("LFU → "); cache_print(lfu);
+
+    printf("\nStats:\n");
+    cache_print_stats(lru);
+    cache_print_stats(lfu);
+
+    cache_destroy(lru);
+    cache_destroy(lfu);
+}
+
+/* ─── Demo 3: FIFO weakness — ignores recency ─────────────────────── */
+static void demo_fifo_vs_lru_recency(void)
+{
+    printf("\n╔═══════════════════════════════════════════════════════╗\n");
+    printf("║  Demo 3: FIFO Weakness — Ignores Recency              ║\n");
+    printf("║  A is hit just before FIFO evicts it anyway           ║\n");
+    printf("╚═══════════════════════════════════════════════════════╝\n\n");
+
+    Cache *lru  = cache_create(3, "LRU");
+    Cache *fifo = cache_create(3, "FIFO");
+
+    /* Step 1: fill cache A,B,C */
+    cache_access(lru,  1); cache_access(fifo, 1);
+    cache_access(lru,  2); cache_access(fifo, 2);
+    cache_access(lru,  3); cache_access(fifo, 3);
+
+    /* Step 2: access A again (touch it to show recency) */
+    cache_access(lru,  1); cache_access(fifo, 1);
+    printf("After touching A again:\n");
+    printf("LRU:  A is now MRU → safe from eviction\n");
+    printf("FIFO: A is still oldest → will be evicted next!\n\n");
+
+    /* Step 3: insert D — who gets evicted? */
+    int rl = cache_access(lru,  4);   /* LRU evicts B (LRU entry)   */
+    int rf = cache_access(fifo, 4);   /* FIFO evicts A (oldest load) */
+    printf("Insert D:\n");
+    printf("  LRU  evicts → B (actual LRU)  | D result: %s\n",
+           rl == CACHE_HIT ? "HIT" : "MISS");
+    printf("  FIFO evicts → A (oldest load) | D result: %s\n",
+           rf == CACHE_HIT ? "HIT" : "MISS");
+
+    /* Step 4: access A — was it kept? */
+    int lru_a  = cache_access(lru,  1);
+    int fifo_a = cache_access(fifo, 1);
+    printf("\nAccess A after D inserted:\n");
+    printf("  LRU:  A → %s (A was promoted, still in cache)\n",
+           lru_a  == CACHE_HIT ? "HIT  ✓" : "MISS ✗");
+    printf("  FIFO: A → %s (A was evicted despite recent access!)\n",
+           fifo_a == CACHE_HIT ? "HIT  ✓" : "MISS ✗");
+
+    printf("\nStats:\n");
+    cache_print_stats(lru);
+    cache_print_stats(fifo);
+
+    cache_destroy(lru);
+    cache_destroy(fifo);
 }
 
 /* ─── Main ─────────────────────────────────────────────────────────── */
 int main(void)
 {
-    printf("╔══════════════════════════════════════════════════════╗\n");
-    printf("║       CPU Cache Replacement Simulator — Day 4        ║\n");
-    printf("║       LRU (Least Recently Used) Implementation       ║\n");
-    printf("╚══════════════════════════════════════════════════════╝\n");
+    printf("╔══════════════════════════════════════════════════════════╗\n");
+    printf("║     CPU Cache Replacement Simulator — Day 5              ║\n");
+    printf("║     LRU · FIFO · LFU with Unified Interface             ║\n");
+    printf("╚══════════════════════════════════════════════════════════╝\n");
 
-    demo_lru_plan_sequence();
-    demo_locality();
-
-    printf("\nBuild & run tests:\n");
-    printf("  gcc -Wall -o test_lru tests/test_lru.c src/cache/lru.c -Isrc/cache\n");
-    printf("  ./test_lru\n\n");
+    demo_policy_comparison();
+    demo_lfu_pollution();
+    demo_fifo_vs_lru_recency();
 
     return EXIT_SUCCESS;
 }
