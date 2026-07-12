@@ -1,194 +1,152 @@
 /*
- * main.c — CPU Cache Replacement Simulator
+ * main.c -- CPU Cache Replacement Simulator
  *
- * Day 5: Demonstrates LRU, FIFO, and LFU policies side-by-side.
- * Uses the unified Cache interface introduced today.
+ *   : Trace-driven simulation demos.
+ *   - Run simple.trace through all 3 policies and compare
+ *   - Run valgrind.trace to show instruction vs data access breakdown
+ *   - Run matrix.trace to illustrate spatial locality impact
  *
  * Build:
- *   gcc -Wall -Wextra -std=c11 -O2 -o simulator \
- *       src/main.c src/cache/lru.c src/cache/fifo.c \
- *       src/cache/lfu.c src/cache/cache.c -Isrc/cache
- * Run:
- *   ./simulator
+ *   gcc -Wall -Wextra -std=c11 -O2 -o simulator
+ *       src/main.c src/trace.c src/simulator.c
+ *       src/cache/lru.c src/cache/fifo.c src/cache/lfu.c
+ *       src/cache/cache.c src/cache/set_cache.c
+ *       -Isrc -Isrc/cache
  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
-#include "cache.h"
+#include "simulator.h"
+#include "trace.h"
 
-/* ─── Helper: run a named access sequence on a cache ─────────────── */
-static void run_sequence(Cache *c, const char **labels,
-                         const uint64_t *addrs, int n)
+/* ------------------------------------------------------------------ */
+/* Helper: build a SimConfig                                            */
+/* ------------------------------------------------------------------ */
+static SimConfig make_cfg(int sets, int ways, int line,
+                          CachePolicy pol, const char *trace)
 {
-    printf("\n%-6s | %-8s | %-12s | %s\n",
-           "Step", "Addr", "Result", "Policy");
-    printf("──────────────────────────────────────\n");
-
-    for (int i = 0; i < n; i++) {
-        int r = cache_access(c, addrs[i]);
-        printf("%-6d | %-8s | %-12s | %s\n",
-               i + 1,
-               labels[i],
-               r == CACHE_HIT ? "HIT  ✓" : "MISS ✗",
-               c->policy_name);
-    }
+    SimConfig c;
+    memset(&c, 0, sizeof(c));
+    c.n_sets    = sets;
+    c.n_ways    = ways;
+    c.line_size = line;
+    c.policy    = pol;
+    c.trace_path = trace;
+    return c;
 }
 
-/* ─── Demo 1: Same sequence across all 3 policies ─────────────────── */
+/* ------------------------------------------------------------------ */
+/* Demo 1: simple.trace -- LRU vs FIFO vs LFU                          */
+/* ------------------------------------------------------------------ */
 static void demo_policy_comparison(void)
 {
-    printf("\n╔═══════════════════════════════════════════════════════╗\n");
-    printf("║  Demo 1: LRU vs FIFO vs LFU on [A,B,C,A,D,B] cap=3  ║\n");
-    printf("╚═══════════════════════════════════════════════════════╝\n");
+    printf("\n==================================================\n");
+    printf("  Demo 1: Policy comparison on simple.trace\n");
+    printf("  Cache: 2-way, 4 sets, 64-byte lines (512 B)\n");
+    printf("==================================================\n");
 
-    const char    *labels[] = {"A","B","C","A","D","B"};
-    const uint64_t addrs[]  = { 1,  2,  3,  1,  4,  2};
-    int n = 6;
-
-    const char *policies[] = {"LRU", "FIFO", "LFU"};
-
-    printf("\n%-8s | %-5s | %-5s | %s\n",
-           "Policy", "Hits", "Miss", "Hit Rate");
-    printf("──────────────────────────────────\n");
-
-    for (int p = 0; p < 3; p++) {
-        Cache *c = cache_create(3, policies[p]);
-
-        int hits = 0, total = n;
-        for (int i = 0; i < n; i++)
-            if (cache_access(c, addrs[i]) == CACHE_HIT) hits++;
-
-        printf("%-8s | %-5d | %-5d | %.2f%%\n",
-               policies[p], hits, total - hits,
-               100.0 * hits / total);
-        cache_destroy(c);
-    }
-
-    /* Now print step-by-step for each policy */
-    for (int p = 0; p < 3; p++) {
-        Cache *c = cache_create(3, policies[p]);
-        printf("\n── %s ────────────────────────────────", policies[p]);
-        run_sequence(c, labels, addrs, n);
-        cache_print_stats(c);
-        cache_destroy(c);
-    }
-}
-
-/* ─── Demo 2: LFU cache pollution ─────────────────────────────────── */
-static void demo_lfu_pollution(void)
-{
-    printf("\n╔═══════════════════════════════════════════════════════╗\n");
-    printf("║  Demo 2: LFU Cache Pollution                          ║\n");
-    printf("║  Hot item A (freq=10) blocks new items from cache     ║\n");
-    printf("╚═══════════════════════════════════════════════════════╝\n\n");
-
-    Cache *lru = cache_create(3, "LRU");
-    Cache *lfu = cache_create(3, "LFU");
-
-    /* Phase 1: make A hot in both caches */
-    printf("Phase 1: Access A ten times (make it 'hot')\n");
-    for (int i = 0; i < 10; i++) {
-        cache_access(lru, 0xA);
-        cache_access(lfu, 0xA);
-    }
-
-    /* Phase 2: fill with B and C */
-    printf("Phase 2: Load B and C\n");
-    cache_access(lru, 0xB); cache_access(lfu, 0xB);
-    cache_access(lru, 0xC); cache_access(lfu, 0xC);
-
-    /* Phase 3: now A is "cold" — access D, E, F */
-    printf("Phase 3: Access D, E, F (A is no longer needed)\n\n");
-
-    const uint64_t new_data[] = {0xD, 0xE, 0xF};
-    const char    *nd_labels[] = {"D", "E", "F"};
-
-    printf("%-6s | %-4s %-8s | %-4s %-8s\n",
-           "Addr", "LRU", "Result", "LFU", "Result");
-    printf("──────────────────────────────────────────────\n");
+    CachePolicy pols[] = {POLICY_LRU, POLICY_FIFO, POLICY_LFU};
+    SimResult   results[3];
+    SimConfig   configs[3];
 
     for (int i = 0; i < 3; i++) {
-        int rl = cache_access(lru, new_data[i]);
-        int rf = cache_access(lfu, new_data[i]);
-        printf("  %-4s | %-4s %-8s | %-4s %-8s\n",
-               nd_labels[i],
-               "LRU:", rl == CACHE_HIT ? "HIT" : "MISS",
-               "LFU:", rf == CACHE_HIT ? "HIT" : "MISS");
+        configs[i] = make_cfg(4, 2, 64, pols[i], "traces/simple.trace");
+        results[i] = simulator_run(&configs[i]);
+        if (!results[i].success) {
+            printf("  [!] Could not run simulation for policy %d\n", i);
+        }
     }
 
-    printf("\nFinal cache contents:\n");
-    printf("LRU → "); cache_print(lru);
-    printf("LFU → "); cache_print(lfu);
-
-    printf("\nStats:\n");
-    cache_print_stats(lru);
-    cache_print_stats(lfu);
-
-    cache_destroy(lru);
-    cache_destroy(lfu);
+    simulator_print_comparison(results, configs, 3);
 }
 
-/* ─── Demo 3: FIFO weakness — ignores recency ─────────────────────── */
-static void demo_fifo_vs_lru_recency(void)
+/* ------------------------------------------------------------------ */
+/* Demo 2: valgrind.trace -- full report with access breakdown          */
+/* ------------------------------------------------------------------ */
+static void demo_valgrind_trace(void)
 {
-    printf("\n╔═══════════════════════════════════════════════════════╗\n");
-    printf("║  Demo 3: FIFO Weakness — Ignores Recency              ║\n");
-    printf("║  A is hit just before FIFO evicts it anyway           ║\n");
-    printf("╚═══════════════════════════════════════════════════════╝\n\n");
+    printf("\n==================================================\n");
+    printf("  Demo 2: Full report on valgrind.trace\n");
+    printf("  Cache: 2-way, 4 sets, 64-byte lines (512 B)\n");
+    printf("==================================================\n");
 
-    Cache *lru  = cache_create(3, "LRU");
-    Cache *fifo = cache_create(3, "FIFO");
-
-    /* Step 1: fill cache A,B,C */
-    cache_access(lru,  1); cache_access(fifo, 1);
-    cache_access(lru,  2); cache_access(fifo, 2);
-    cache_access(lru,  3); cache_access(fifo, 3);
-
-    /* Step 2: access A again (touch it to show recency) */
-    cache_access(lru,  1); cache_access(fifo, 1);
-    printf("After touching A again:\n");
-    printf("LRU:  A is now MRU → safe from eviction\n");
-    printf("FIFO: A is still oldest → will be evicted next!\n\n");
-
-    /* Step 3: insert D — who gets evicted? */
-    int rl = cache_access(lru,  4);   /* LRU evicts B (LRU entry)   */
-    int rf = cache_access(fifo, 4);   /* FIFO evicts A (oldest load) */
-    printf("Insert D:\n");
-    printf("  LRU  evicts → B (actual LRU)  | D result: %s\n",
-           rl == CACHE_HIT ? "HIT" : "MISS");
-    printf("  FIFO evicts → A (oldest load) | D result: %s\n",
-           rf == CACHE_HIT ? "HIT" : "MISS");
-
-    /* Step 4: access A — was it kept? */
-    int lru_a  = cache_access(lru,  1);
-    int fifo_a = cache_access(fifo, 1);
-    printf("\nAccess A after D inserted:\n");
-    printf("  LRU:  A → %s (A was promoted, still in cache)\n",
-           lru_a  == CACHE_HIT ? "HIT  ✓" : "MISS ✗");
-    printf("  FIFO: A → %s (A was evicted despite recent access!)\n",
-           fifo_a == CACHE_HIT ? "HIT  ✓" : "MISS ✗");
-
-    printf("\nStats:\n");
-    cache_print_stats(lru);
-    cache_print_stats(fifo);
-
-    cache_destroy(lru);
-    cache_destroy(fifo);
+    SimConfig cfg = make_cfg(4, 2, 64, POLICY_LRU, "traces/valgrind.trace");
+    SimResult r   = simulator_run(&cfg);
+    simulator_print_report(&r, &cfg);
 }
 
-/* ─── Main ─────────────────────────────────────────────────────────── */
+/* ------------------------------------------------------------------ */
+/* Demo 3: Associativity impact on matrix.trace                        */
+/* ------------------------------------------------------------------ */
+static void demo_associativity_on_trace(void)
+{
+    printf("\n==================================================\n");
+    printf("  Demo 3: Associativity impact on matrix.trace\n");
+    printf("  1-way vs 2-way vs 4-way, 4 sets, 16-byte lines\n");
+    printf("==================================================\n");
+
+    int ways_arr[] = {1, 2, 4};
+    int sets_arr[] = {4, 4, 4};   /* same number of sets */
+    SimResult results[3];
+    SimConfig configs[3];
+
+    for (int i = 0; i < 3; i++) {
+        configs[i] = make_cfg(sets_arr[i], ways_arr[i], 16,
+                              POLICY_LRU, "traces/matrix.trace");
+        results[i] = simulator_run(&configs[i]);
+    }
+
+    simulator_print_comparison(results, configs, 3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Demo 4: Peek at trace file contents (trace reader demo)             */
+/* ------------------------------------------------------------------ */
+static void demo_trace_reader(void)
+{
+    printf("\n==================================================\n");
+    printf("  Demo 4: Trace reader -- first 5 records\n");
+    printf("  File: traces/simple.trace\n");
+    printf("==================================================\n");
+
+    TraceReader *tr = trace_open("traces/simple.trace");
+    if (!tr) { printf("  [!] Could not open trace file.\n"); return; }
+
+    TraceRecord rec;
+    int count = 0;
+    printf("  %-4s | %-8s | %-6s | %s\n", "No.", "Address", "Size", "Type");
+    printf("  ----------------------------------------\n");
+    while (count < 5 && trace_next(tr, &rec) == 1) {
+        printf("  %-4d | 0x%06llx | %-6d | %s\n",
+               count + 1,
+               (unsigned long long)rec.address,
+               rec.size,
+               trace_access_type_str(rec.type));
+        count++;
+    }
+
+    printf("\n  Trace reader stats after reading 5 records:\n");
+    printf("    Lines read   : %llu\n", (unsigned long long)tr->lines_read);
+    printf("    Lines skipped: %llu\n", (unsigned long long)tr->lines_skipped);
+
+    trace_close(tr);
+}
+
+/* ------------------------------------------------------------------ */
+/* Main                                                                 */
+/* ------------------------------------------------------------------ */
 int main(void)
 {
-    printf("╔══════════════════════════════════════════════════════════╗\n");
-    printf("║     CPU Cache Replacement Simulator — Day 5              ║\n");
-    printf("║     LRU · FIFO · LFU with Unified Interface             ║\n");
-    printf("╚══════════════════════════════════════════════════════════╝\n");
+    printf("==================================================\n");
+    printf("  CPU Cache Replacement Simulator -- Day 7\n");
+    printf("  Trace-Driven Simulation\n");
+    printf("==================================================\n");
 
+    demo_trace_reader();
     demo_policy_comparison();
-    demo_lfu_pollution();
-    demo_fifo_vs_lru_recency();
+    demo_valgrind_trace();
+    demo_associativity_on_trace();
 
     return EXIT_SUCCESS;
 }
