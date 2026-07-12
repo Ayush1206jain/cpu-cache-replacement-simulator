@@ -1,0 +1,44 @@
+# simple.trace -- hand-crafted test trace (simple R/W format)
+#
+# Used to verify trace reader and simulator by hand-calculation.
+#
+# Cache config for manual verification:
+#   2-way, 4 sets, 64-byte lines (total = 512 bytes)
+#   offset_bits = 6, index_bits = 2
+#   set_index = (addr >> 6) & 0x3
+#
+# Address -> set mapping:
+#   0x000 = set 0, tag 0
+#   0x040 = set 1, tag 0
+#   0x080 = set 2, tag 0
+#   0x0C0 = set 3, tag 0
+#   0x100 = set 0, tag 1    (same set as 0x000, different tag)
+#   0x200 = set 0, tag 2
+#   0x140 = set 1, tag 1
+#
+# Expected hand-trace (2-way LRU):
+#   R 0x000  --> MISS (cold, set0 way0 loaded)
+#   R 0x040  --> MISS (cold, set1 way0 loaded)
+#   R 0x080  --> MISS (cold, set2 way0 loaded)
+#   R 0x000  --> HIT  (set0, tag0 still in way0)
+#   R 0x100  --> MISS (cold, set0 way1 loaded -- 2 ways used now)
+#   R 0x000  --> HIT  (set0, tag0 still in way0, A=MRU)
+#   W 0x200  --> MISS (set0 full: evict tag1=0x100 LRU, load tag2)
+#   R 0x000  --> HIT  (set0, tag0 survived)
+#   R 0x100  --> MISS (0x100 was evicted)
+#   W 0x040  --> HIT  (set1, still loaded)
+#
+# Expected totals: 10 accesses, 4 hits, 6 misses, hit rate = 40.00%
+# Steps that HIT: step4(R0x000), step6(R0x000), step8(R0x000), step10(W0x040)
+# Step7 W0x200: set0 full, evicts tag1(0x100) as LRU, loads tag2 -> MISS
+
+R 0x000
+R 0x040
+R 0x080
+R 0x000
+R 0x100
+R 0x000
+W 0x200
+R 0x000
+R 0x100
+W 0x040

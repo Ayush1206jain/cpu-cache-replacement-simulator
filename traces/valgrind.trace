@@ -1,0 +1,46 @@
+# valgrind.trace -- Valgrind lackey-style trace
+#
+# Format: <op> <hex_addr>,<size>
+#   I = instruction fetch  (READ)
+#   L = data load          (READ)
+#   S = data store         (WRITE)
+#   M = modify (load+store)(MODIFY = 2 accesses)
+#
+# This simulates a small loop:
+#   for (int i = 0; i < 4; i++) { arr[i] += 1; }
+#
+# Cache: 2-way, 4 sets, 64-byte lines
+# Addresses chosen so arr[0..3] all land in set 0.
+#   arr[0] = 0x000, arr[1] = 0x004, arr[2] = 0x008, arr[3] = 0x00C
+#   (all within same 64-byte line -> same cache line!)
+#
+# Expected behaviour:
+#   First M 0x000 -> read MISS + write HIT (same line, write loads after read)
+#   Subsequent M 0x004,0x008,0x00C -> all HIT (same line already loaded)
+#   I (instruction fetches) -> separate addresses, likely misses on first fetch
+#
+# Instruction addresses (PC increments by 4 each iteration):
+#   loop body at 0x400510, 0x400514, 0x400518, 0x40051C
+
+# Iteration 1
+I  0x400510,4
+L  0x000000,4
+S  0x000000,4
+
+# Iteration 2
+I  0x400510,4
+M  0x000004,4
+
+# Iteration 3
+I  0x400510,4
+M  0x000008,4
+
+# Iteration 4
+I  0x400510,4
+M  0x00000C,4
+
+# A load from a different address (stack)
+L  0x7fff5a3c,8
+
+# A store to a different set
+S  0x00000080,4

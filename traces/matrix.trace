@@ -1,0 +1,45 @@
+# matrix.trace -- simulates a naive matrix multiply access pattern
+#
+# Demonstrates cache thrashing with column-major access in row-major storage.
+# 4x4 int matrix, each element = 4 bytes.
+# Row-major layout: A[0][0]=0x1000, A[0][1]=0x1004, A[0][2]=0x1008...
+#                   A[1][0]=0x1010, A[1][1]=0x1014...
+# Column access pattern: A[0][0], A[1][0], A[2][0], A[3][0] (stride=16)
+#
+# Cache: 1-way, 4 sets, 16-byte lines (tiny, to provoke conflict misses)
+#   line_size=16 -> offset_bits=4
+#   n_sets=4     -> index_bits=2
+#   set = (addr >> 4) & 3
+
+# --- Row 0 access (row-major: good locality, hits same cache line) ---
+R 0x1000
+R 0x1004
+R 0x1008
+R 0x100C
+
+# --- Row 1 access ---
+R 0x1010
+R 0x1014
+R 0x1018
+R 0x101C
+
+# --- Column access (stride = 16 bytes = 1 cache line, hits same set!) ---
+# A[0][0], A[1][0], A[2][0], A[3][0]
+R 0x1000
+R 0x1010
+R 0x1020
+R 0x1030
+
+# Each of these lands in set = (addr >> 4) & 3
+# 0x1000 -> (0x100) & 3 = 0  set 0
+# 0x1010 -> (0x101) & 3 = 1  set 1
+# 0x1020 -> (0x102) & 3 = 2  set 2
+# 0x1030 -> (0x103) & 3 = 3  set 3
+# Good news: different sets -> no conflict on this small example.
+# With larger matrices (stride = cache size), you get true thrashing.
+
+# --- Write-back phase ---
+W 0x1000
+W 0x1010
+W 0x1020
+W 0x1030
