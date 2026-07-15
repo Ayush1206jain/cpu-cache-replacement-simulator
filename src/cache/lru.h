@@ -11,7 +11,11 @@
 #ifndef LRU_H
 #define LRU_H
 
+//this are header guard to prevent multiple inclusions of this header file
+
 #include <stdint.h>
+//Bcoz we us uint64_t but why this why not int 
+//bcoz we deal with modern cpu 64bit their address won't fit in 32bit int 
 #include <stddef.h>
 
 /* ─── Result codes ─────────────────────────────────────────────── */
@@ -26,13 +30,16 @@ typedef struct LRUNode {
 } LRUNode;
 
 /* ─── Hash map bucket (chaining) ──────────────────────────────── */
+//this LL is to implement seperate chaining 
+//when two node belong to same bucket it store like buckt1=a->b->c 
+ 
 typedef struct HashEntry {
     uint64_t         address;
     LRUNode         *node;     /* Points into the linked list       */
     struct HashEntry *next;    /* Collision chain                   */
 } HashEntry;
 
-/* ─── Main LRU cache struct ────────────────────────────────────── */
+//  Main LRU cache struct
 typedef struct {
     int       capacity;        /* Max number of entries            */
     int       size;            /* Current number of entries        */
@@ -42,6 +49,9 @@ typedef struct {
     LRUNode  *tail;
 
     /* Hash map for O(1) lookup */
+    //hashEntry->one bucket
+    //hashEntry* ->pointer points to address of one bucket
+    //hashEntry** ->pointer points to address of 1st element of an array of bucket pointers
     HashEntry **table;
     int         table_size;   /* Number of hash buckets            */
 
@@ -57,6 +67,8 @@ typedef struct {
  * Create an LRU cache with the given capacity.
  * Returns NULL on allocation failure.
  */
+
+ //*****these are only function declarations,actual code is in LRU.c file */
 LRUCache *lru_create(int capacity);
 
 /**

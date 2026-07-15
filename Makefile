@@ -18,14 +18,15 @@ IFLAGS = -Isrc -Isrc/cache
 SRC_CACHE = src/cache/lru.c src/cache/fifo.c src/cache/lfu.c \
             src/cache/cache.c src/cache/set_cache.c
 SRC_SIM   = src/trace.c src/simulator.c
+SRC_MULTI = src/multi_cache.c
 SRC_MAIN  = src/main.c
 
 .PHONY: all test test4 test5 test6 test7 run clean
 
 all: simulator
 
-simulator: $(SRC_MAIN) $(SRC_CACHE) $(SRC_SIM)
-	$(CC) $(CFLAGS) $(IFLAGS) -o simulator $^
+simulator: $(SRC_MAIN) $(SRC_CACHE) $(SRC_SIM) $(SRC_MULTI)
+	$(CC) $(CFLAGS) $(IFLAGS) -o simulator $^ -lm
 	@echo "Built: simulator"
 
 test4: tests/test_lru.c src/cache/lru.c
@@ -33,27 +34,32 @@ test4: tests/test_lru.c src/cache/lru.c
 	@echo "Running Day 4 LRU tests..."
 	.\test_lru.exe
 
-test5: tests/test_day5.c $(SRC_CACHE)
+test5: tests/test_fifo_lfu.c $(SRC_CACHE)
 	$(CC) $(CFLAGS) $(IFLAGS) -o test_day5 $^
 	@echo "Running Day 5 FIFO+LFU+Unified tests..."
 	.\test_day5.exe
 
-test6: tests/test_day6.c $(SRC_CACHE)
+test6: tests/test_Nway_set_asso.c $(SRC_CACHE)
 	$(CC) $(CFLAGS) $(IFLAGS) -o test_day6 $^
 	@echo "Running Day 6 Set-Associative tests..."
 	.\test_day6.exe
 
-test7: tests/test_day7.c $(SRC_CACHE) $(SRC_SIM)
+test7: tests/test_trace_reader.c $(SRC_CACHE) $(SRC_SIM)
 	$(CC) $(CFLAGS) $(IFLAGS) -o test_day7 $^
 	@echo "Running Day 7 Trace+Simulator tests..."
 	.\test_day7.exe
 
-test: test4 test5 test6 test7
+test8: tests/test_day8.c $(SRC_CACHE) $(SRC_SIM) $(SRC_MULTI)
+	$(CC) $(CFLAGS) $(IFLAGS) -o test_day8 $^ -lm
+	@echo "Running Day 8 Multi-Level Cache + AMAT tests..."
+	.\test_day8.exe
+
+test: test4 test5 test6 test7 test8
 	@echo "All tests complete."
 
 run: simulator
 	.\simulator.exe
 
 clean:
-	del /Q simulator.exe test_lru.exe test_day5.exe test_day6.exe test_day7.exe 2>nul || true
+	del /Q simulator.exe test_lru.exe test_day5.exe test_day6.exe test_day7.exe test_day8.exe 2>nul || true
 	@echo "Cleaned."

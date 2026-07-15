@@ -17,7 +17,7 @@
  *     than a min-heap with position tracking in C. It also mirrors
  *     how many real embedded controllers implement LFU in firmware.
  *
- * Day 5 — CPU Cache Replacement Simulator
+ *  — CPU Cache Replacement Simulator
  */
 
 #include "lfu.h"
@@ -194,7 +194,7 @@ static int cmp_entry_freq(const void *a, const void *b)
 
 void lfu_print(const LFUCache *cache)
 {
-    printf("LFU Cache (size=%d / capacity=%d) [lowest freq → highest]:\n",
+    printf("LFU Cache (size=%d / capacity=%d) [lowest freq -> highest]:\n",
            cache->size, cache->capacity);
 
     /* Copy entries for sorted display (don't mutate live array) */
@@ -224,16 +224,16 @@ void lfu_print_stats(const LFUCache *cache)
                      ? (100.0 * (double)cache->hits / (double)total)
                      : 0.0;
 
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
     printf("LFU Cache Statistics\n");
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
     printf("  Capacity  : %d\n",      cache->capacity);
     printf("  Accesses  : %llu\n",    (unsigned long long)total);
     printf("  Hits      : %llu\n",    (unsigned long long)cache->hits);
     printf("  Misses    : %llu\n",    (unsigned long long)cache->misses);
     printf("  Evictions : %llu\n",    (unsigned long long)cache->evictions);
     printf("  Hit Rate  : %.2f%%\n",  hr);
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
 }
 
 void lfu_destroy(LFUCache *cache)

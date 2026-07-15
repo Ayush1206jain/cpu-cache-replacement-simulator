@@ -13,13 +13,15 @@
  *   On HIT:  find node via hash map, unlink it, re-insert at head.
  *   On MISS: if full → evict tail node; create new node at head.
  *
- * Day 4 — CPU Cache Replacement Simulator
+ * CPU Cache Replacement Simulator
  */
 
 #include "lru.h"
-
+//contain structure,macros,function declarations
 #include <stdio.h>
+//we are using printf(),fprintf() 
 #include <stdlib.h>
+// calloc(),malloc(),free()
 #include <string.h>
 
 /* ─── Internal constants ─────────────────────────────────────────── */
@@ -34,8 +36,12 @@
  * Simple multiplicative hash for 64-bit addresses.
  * Knuth's multiplicative constant: 2^64 / φ (golden ratio).
  */
+
+ //convert 64bit address to bucket number
 static inline int hash_addr(uint64_t address, int table_size)
-{
+{   
+
+    //multiply huge number to distribute addresses uniformly across buckets
     uint64_t key = address * 11400714819323198485ULL;
     return (int)(key % (uint64_t)table_size);
 }
@@ -45,11 +51,15 @@ static inline int hash_addr(uint64_t address, int table_size)
 /** Unlink node from wherever it sits in the list (does NOT free it). */
 static void list_unlink(LRUCache *c, LRUNode *node)
 {
-    if (node->prev) node->prev->next = node->next;
-    else            c->head          = node->next;   /* was head */
+    if (node->prev) 
+    node->prev->next = node->next;
+    else            
+    c->head= node->next;   /* was head */
 
-    if (node->next) node->next->prev = node->prev;
-    else            c->tail          = node->prev;   /* was tail */
+    if (node->next) 
+    node->next->prev = node->prev;
+    else            
+    c->tail= node->prev;   /* was tail */
 
     node->prev = node->next = NULL;
 }
@@ -60,7 +70,9 @@ static void list_push_front(LRUCache *c, LRUNode *node)
     node->prev = NULL;
     node->next = c->head;
 
-    if (c->head) c->head->prev = node;
+    if (c->head) 
+    c->head->prev = node;
+    
     c->head = node;
 
     if (!c->tail) c->tail = node;   /* first insertion */
@@ -111,8 +123,10 @@ static void hashmap_remove(LRUCache *c, uint64_t address)
 
     while (entry) {
         if (entry->address == address) {
-            if (prev) prev->next      = entry->next;
-            else      c->table[idx]   = entry->next;
+            if (prev) 
+            prev->next= entry->next;
+            else      
+            c->table[idx] = entry->next;
             free(entry);
             return;
         }
@@ -205,8 +219,7 @@ int lru_access(LRUCache *cache, uint64_t address)
 
 void lru_print(const LRUCache *cache)
 {
-    printf("LRU Cache (size=%d / capacity=%d) [MRU → LRU]:\n",
-           cache->size, cache->capacity);
+    printf("LRU Cache (size=%d / capacity=%d) [MRU -> LRU]:\n",cache->size, cache->capacity);
 
     LRUNode *cur = cache->head;
     int pos = 0;
@@ -225,16 +238,16 @@ void lru_print_stats(const LRUCache *cache)
                      ? (100.0 * (double)cache->hits / (double)total)
                      : 0.0;
 
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
     printf("LRU Cache Statistics\n");
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
     printf("  Capacity  : %d\n",      cache->capacity);
     printf("  Accesses  : %llu\n",    (unsigned long long)total);
     printf("  Hits      : %llu\n",    (unsigned long long)cache->hits);
     printf("  Misses    : %llu\n",    (unsigned long long)cache->misses);
     printf("  Evictions : %llu\n",    (unsigned long long)cache->evictions);
     printf("  Hit Rate  : %.2f%%\n",  hr);
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
 }
 
 void lru_destroy(LRUCache *cache)

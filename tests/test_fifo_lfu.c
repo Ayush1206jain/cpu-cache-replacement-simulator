@@ -58,12 +58,12 @@ static void test_fifo_plan_sequence(void)
     ASSERT(c != NULL, "fifo_create returns non-NULL");
 
     int r;
-    r = fifo_access(c, 1); ASSERT(r == CACHE_MISS, "A → MISS");
-    r = fifo_access(c, 2); ASSERT(r == CACHE_MISS, "B → MISS");
-    r = fifo_access(c, 3); ASSERT(r == CACHE_MISS, "C → MISS");
-    r = fifo_access(c, 1); ASSERT(r == CACHE_HIT,  "A → HIT");
-    r = fifo_access(c, 4); ASSERT(r == CACHE_MISS, "D → MISS (A evicted despite recent hit!)");
-    r = fifo_access(c, 2); ASSERT(r == CACHE_HIT,  "B → HIT");
+    r = fifo_access(c, 1); ASSERT(r == CACHE_MISS, "A -> MISS");
+    r = fifo_access(c, 2); ASSERT(r == CACHE_MISS, "B -> MISS");
+    r = fifo_access(c, 3); ASSERT(r == CACHE_MISS, "C -> MISS");
+    r = fifo_access(c, 1); ASSERT(r == CACHE_HIT,  "A -> HIT");
+    r = fifo_access(c, 4); ASSERT(r == CACHE_MISS, "D -> MISS (A evicted despite recent hit!)");
+    r = fifo_access(c, 2); ASSERT(r == CACHE_HIT,  "B -> HIT");
 
     ASSERT(c->hits      == 2, "hits == 2");
     ASSERT(c->misses    == 4, "misses == 4");
@@ -71,7 +71,7 @@ static void test_fifo_plan_sequence(void)
 
     /* After D inserted, A was evicted. Verify A is gone now. */
     r = fifo_access(c, 1);
-    ASSERT(r == CACHE_MISS, "A → MISS (confirms A was evicted by FIFO)");
+    ASSERT(r == CACHE_MISS, "A -> MISS (confirms A was evicted by FIFO)");
 
     fifo_print(c);
     fifo_print_stats(c);
@@ -90,10 +90,10 @@ static void test_fifo_capacity_one(void)
     ASSERT(c != NULL, "fifo_create(1) succeeds");
 
     int r;
-    r = fifo_access(c, 0xAA); ASSERT(r == CACHE_MISS, "0xAA → MISS");
-    r = fifo_access(c, 0xAA); ASSERT(r == CACHE_HIT,  "0xAA → HIT (same addr)");
-    r = fifo_access(c, 0xBB); ASSERT(r == CACHE_MISS, "0xBB → MISS (0xAA evicted)");
-    r = fifo_access(c, 0xAA); ASSERT(r == CACHE_MISS, "0xAA → MISS (0xBB evicted)");
+    r = fifo_access(c, 0xAA); ASSERT(r == CACHE_MISS, "0xAA -> MISS");
+    r = fifo_access(c, 0xAA); ASSERT(r == CACHE_HIT,  "0xAA -> HIT (same addr)");
+    r = fifo_access(c, 0xBB); ASSERT(r == CACHE_MISS, "0xBB -> MISS (0xAA evicted)");
+    r = fifo_access(c, 0xAA); ASSERT(r == CACHE_MISS, "0xAA -> MISS (0xBB evicted)");
 
     ASSERT(c->hits == 1,      "hits == 1");
     ASSERT(c->misses == 3,    "misses == 3");
@@ -129,10 +129,10 @@ static void test_fifo_circular_wrap(void)
      * Access 6 → MISS: 1 evicted → queue [4,5,6]
      * All are misses because each re-insertion evicts the current head. */
     int r;
-    r = fifo_access(c, 1); ASSERT(r == CACHE_MISS, "1 → MISS (evicted in wrap-around cycle)");
-    r = fifo_access(c, 4); ASSERT(r == CACHE_MISS, "4 → MISS (evicted when 1 was re-inserted)");
-    r = fifo_access(c, 5); ASSERT(r == CACHE_MISS, "5 → MISS (evicted when 4 was re-inserted)");
-    r = fifo_access(c, 6); ASSERT(r == CACHE_MISS, "6 → MISS (evicted when 5 was re-inserted)");
+    r = fifo_access(c, 1); ASSERT(r == CACHE_MISS, "1 -> MISS (evicted in wrap-around cycle)");
+    r = fifo_access(c, 4); ASSERT(r == CACHE_MISS, "4 -> MISS (evicted when 1 was re-inserted)");
+    r = fifo_access(c, 5); ASSERT(r == CACHE_MISS, "5 -> MISS (evicted when 4 was re-inserted)");
+    r = fifo_access(c, 6); ASSERT(r == CACHE_MISS, "6 -> MISS (evicted when 5 was re-inserted)");
     printf("  Note: circular queue wrap confirmed — ring buffer recycles correctly.\n");
 
     fifo_print(c);
@@ -161,12 +161,12 @@ static void test_lfu_plan_sequence(void)
     ASSERT(c != NULL, "lfu_create returns non-NULL");
 
     int r;
-    r = lfu_access(c, 1); ASSERT(r == CACHE_MISS, "A → MISS");
-    r = lfu_access(c, 2); ASSERT(r == CACHE_MISS, "B → MISS");
-    r = lfu_access(c, 3); ASSERT(r == CACHE_MISS, "C → MISS");
-    r = lfu_access(c, 1); ASSERT(r == CACHE_HIT,  "A → HIT (freq becomes 2)");
-    r = lfu_access(c, 4); ASSERT(r == CACHE_MISS, "D → MISS (B evicted, lowest freq+oldest)");
-    r = lfu_access(c, 2); ASSERT(r == CACHE_MISS, "B → MISS (C evicted, lowest freq+oldest)");
+    r = lfu_access(c, 1); ASSERT(r == CACHE_MISS, "A -> MISS");
+    r = lfu_access(c, 2); ASSERT(r == CACHE_MISS, "B -> MISS");
+    r = lfu_access(c, 3); ASSERT(r == CACHE_MISS, "C -> MISS");
+    r = lfu_access(c, 1); ASSERT(r == CACHE_HIT,  "A -> HIT (freq becomes 2)");
+    r = lfu_access(c, 4); ASSERT(r == CACHE_MISS, "D -> MISS (B evicted, lowest freq+oldest)");
+    r = lfu_access(c, 2); ASSERT(r == CACHE_MISS, "B -> MISS (C evicted, lowest freq+oldest)");
 
     ASSERT(c->hits      == 1, "hits == 1");
     ASSERT(c->misses    == 5, "misses == 5");
@@ -192,11 +192,11 @@ static void test_lfu_frequency_accumulation(void)
 
     /* Now access D — must evict B or C (both freq=1, not A!) */
     int r = lfu_access(c, 0xD);
-    ASSERT(r == CACHE_MISS, "D → MISS (B or C evicted, NOT A despite A being cold now)");
+    ASSERT(r == CACHE_MISS, "D -> MISS (B or C evicted, NOT A despite A being cold now)");
 
     /* A is still in cache — LFU cache pollution! */
     r = lfu_access(c, 0xA);
-    ASSERT(r == CACHE_HIT, "A → HIT (A protected by old high frequency — pollution!)");
+    ASSERT(r == CACHE_HIT, "A -> HIT (A protected by old high frequency - pollution!)");
 
     printf("  ^ This demonstrates LFU cache pollution:\n");
     printf("    Old 'hot' data A (freq=10) blocks new data even if A won't be used again.\n");
@@ -222,16 +222,16 @@ static void test_lfu_tiebreak_lru(void)
      * Access B(2): MISS, evicts C(3) oldest → cache=[4,1,2]
      * Access C(3): MISS — C also evicted in the chain */
     int r = lfu_access(c, 4);
-    ASSERT(r == CACHE_MISS, "D(4) → MISS (A evicted — LRU tie-break)");
+    ASSERT(r == CACHE_MISS, "D(4) -> MISS (A evicted - LRU tie-break)");
 
     r = lfu_access(c, 1);
-    ASSERT(r == CACHE_MISS, "A(1) → MISS (was evicted)");
+    ASSERT(r == CACHE_MISS, "A(1) -> MISS (was evicted)");
 
     r = lfu_access(c, 2);
-    ASSERT(r == CACHE_MISS, "B(2) → MISS (evicted when A re-inserted)");
+    ASSERT(r == CACHE_MISS, "B(2) -> MISS (evicted when A re-inserted)");
 
     r = lfu_access(c, 3);
-    ASSERT(r == CACHE_MISS, "C(3) → MISS (evicted when B re-inserted)");
+    ASSERT(r == CACHE_MISS, "C(3) -> MISS (evicted when B re-inserted)");
 
     printf("  Note: successive misses on equal-freq entries — LRU tie-break chains correctly.\n");
 
@@ -261,7 +261,7 @@ static void test_unified_interface(void)
 
     /* Invalid policy name returns NULL */
     Cache *bad = cache_create(4, "RANDOM");
-    ASSERT(bad == NULL, "Unknown policy → NULL");
+    ASSERT(bad == NULL, "Unknown policy -> NULL");
 }
 
 /* ─── Test 8: Policy comparison on same sequence ─────────────────── */
@@ -276,7 +276,7 @@ static void test_policy_comparison(void)
     const char *policies[] = {"LRU", "FIFO", "LFU"};
 
     printf("  %-6s | %5s | %5s | %8s\n", "Policy", "Hits", "Miss", "Hit Rate");
-    printf("  ────────────────────────────────\n");
+    printf("  --------------------------------\n");
 
     for (int p = 0; p < 3; p++) {
         Cache *c = cache_create(3, policies[p]);
@@ -301,7 +301,7 @@ static void test_policy_comparison(void)
 int main(void)
 {
     printf("============================================\n");
-    printf("  Day 5 Unit Tests — FIFO + LFU + Unified\n");
+    printf("  Day 5 Unit Tests - FIFO + LFU + Unified\n");
     printf("  CPU Cache Replacement Simulator\n");
     printf("============================================\n");
 

@@ -253,9 +253,9 @@ void set_cache_print_stats(const SetAssocCache *cache)
 
     int total_size_kb = (cache->n_sets * cache->n_ways * cache->line_size) / 1024;
 
-    printf("──────────────────────────────────────────────\n");
-    printf("Set-Associative Cache — %s Policy\n", cache->policy_name);
-    printf("──────────────────────────────────────────────\n");
+    printf("----------------------------------------------\n");
+    printf("Set-Associative Cache - %s Policy\n", cache->policy_name);
+    printf("----------------------------------------------\n");
     printf("  Config     : %d-way, %d sets, %d-byte lines\n",
            cache->n_ways, cache->n_sets, cache->line_size);
     printf("  Total size : %d KB  (%d bytes)\n",
@@ -269,7 +269,7 @@ void set_cache_print_stats(const SetAssocCache *cache)
     printf("  Misses     : %llu\n",   (unsigned long long)cache->misses);
     printf("  Evictions  : %llu\n",   (unsigned long long)cache->evictions);
     printf("  Hit Rate   : %.2f%%\n", hr);
-    printf("──────────────────────────────────────────────\n");
+    printf("----------------------------------------------\n");
 }
 
 void set_cache_print_contents(const SetAssocCache *cache)

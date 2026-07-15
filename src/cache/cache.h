@@ -30,16 +30,20 @@ typedef enum {
     POLICY_FIFO = 1,
     POLICY_LFU  = 2,
     POLICY_COUNT         /* Sentinel — keep last */
+    //keep track of how many policies you have if you add one then it automatically updated 
 } CachePolicy;
 
 /* ─── Unified cache handle (vtable pattern) ──────────────────────── */
 typedef struct Cache {
     CachePolicy  policy;
     const char  *policy_name;
-    void        *impl;            /* Opaque pointer to concrete cache  */
+    void        *impl;     
+    //pointer to anything
+    /* Opaque pointer to concrete cache  */
 
     /* Function pointers — filled in by cache_create() */
     int  (*fn_access)     (void *impl, uint64_t address);
+    //fn_access is a pointer to a function that takes void*,uint64_t and returns int 
     void (*fn_print_stats)(const void *impl);
     void (*fn_print)      (const void *impl);
     void (*fn_destroy)    (void *impl);

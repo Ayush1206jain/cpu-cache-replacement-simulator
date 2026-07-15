@@ -136,7 +136,7 @@ int fifo_access(FIFOCache *cache, uint64_t address)
 
 void fifo_print(const FIFOCache *cache)
 {
-    printf("FIFO Cache (size=%d / capacity=%d) [oldest → newest]:\n",
+    printf("FIFO Cache (size=%d / capacity=%d) [oldest -> newest]:\n",
            cache->size, cache->capacity);
     for (int i = 0; i < cache->size; i++) {
         int idx = (cache->head + i) % cache->capacity;
@@ -154,16 +154,16 @@ void fifo_print_stats(const FIFOCache *cache)
                      ? (100.0 * (double)cache->hits / (double)total)
                      : 0.0;
 
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
     printf("FIFO Cache Statistics\n");
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
     printf("  Capacity  : %d\n",      cache->capacity);
     printf("  Accesses  : %llu\n",    (unsigned long long)total);
     printf("  Hits      : %llu\n",    (unsigned long long)cache->hits);
     printf("  Misses    : %llu\n",    (unsigned long long)cache->misses);
     printf("  Evictions : %llu\n",    (unsigned long long)cache->evictions);
     printf("  Hit Rate  : %.2f%%\n",  hr);
-    printf("──────────────────────────────────\n");
+    printf("----------------------------------\n");
 }
 
 void fifo_destroy(FIFOCache *cache)

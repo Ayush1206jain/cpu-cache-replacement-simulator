@@ -24,7 +24,7 @@
 static int tests_run    = 0;
 static int tests_passed = 0;
 
-#define ASSERT(cond, msg)                                       \
+#define ASSERT(cond,msg)                                       \
     do {                                                        \
         tests_run++;                                            \
         if (cond) {                                             \
@@ -33,7 +33,7 @@ static int tests_passed = 0;
         } else {                                                \
             printf("  [FAIL] %s  (line %d)\n", msg, __LINE__); \
         }                                                       \
-    } while (0)
+    } while (0);
 
 /* ─── Helper: map letter to address ──────────────────────────────── */
 /* A=0x0A, B=0x0B, C=0x0C, D=0x0D for readability */
@@ -60,12 +60,12 @@ static void test_plan_sequence(void)
 
     int r;
 
-    r = lru_access(c, addr('A')); ASSERT(r == CACHE_MISS, "A → MISS");
-    r = lru_access(c, addr('B')); ASSERT(r == CACHE_MISS, "B → MISS");
-    r = lru_access(c, addr('C')); ASSERT(r == CACHE_MISS, "C → MISS");
-    r = lru_access(c, addr('A')); ASSERT(r == CACHE_HIT,  "A → HIT (temporal locality)");
-    r = lru_access(c, addr('D')); ASSERT(r == CACHE_MISS, "D → MISS (B evicted)");
-    r = lru_access(c, addr('B')); ASSERT(r == CACHE_MISS, "B → MISS (C evicted)");
+    r = lru_access(c, addr('A')); ASSERT(r == CACHE_MISS, "A -> MISS");
+    r = lru_access(c, addr('B')); ASSERT(r == CACHE_MISS, "B -> MISS");
+    r = lru_access(c, addr('C')); ASSERT(r == CACHE_MISS, "C -> MISS");
+    r = lru_access(c, addr('A')); ASSERT(r == CACHE_HIT,  "A -> HIT (temporal locality)");
+    r = lru_access(c, addr('D')); ASSERT(r == CACHE_MISS, "D -> MISS (B evicted)");
+    r = lru_access(c, addr('B')); ASSERT(r == CACHE_MISS, "B -> MISS (C evicted)");
 
     ASSERT(c->hits      == 1, "hits == 1");
     ASSERT(c->misses    == 5, "misses == 5");
@@ -85,10 +85,10 @@ static void test_capacity_one(void)
     ASSERT(c != NULL, "lru_create(1) succeeds");
 
     int r;
-    r = lru_access(c, 0x100); ASSERT(r == CACHE_MISS, "0x100 → MISS");
-    r = lru_access(c, 0x100); ASSERT(r == CACHE_HIT,  "0x100 → HIT (same addr)");
-    r = lru_access(c, 0x200); ASSERT(r == CACHE_MISS, "0x200 → MISS (0x100 evicted)");
-    r = lru_access(c, 0x100); ASSERT(r == CACHE_MISS, "0x100 → MISS (0x200 evicted)");
+    r = lru_access(c, 0x100); ASSERT(r == CACHE_MISS, "0x100 -> MISS");
+    r = lru_access(c, 0x100); ASSERT(r == CACHE_HIT,  "0x100 -> HIT (same addr)");
+    r = lru_access(c, 0x200); ASSERT(r == CACHE_MISS, "0x200 -> MISS (0x100 evicted)");
+    r = lru_access(c, 0x100); ASSERT(r == CACHE_MISS, "0x100 -> MISS (0x200 evicted)");
 
     ASSERT(c->hits      == 1, "hits == 1");
     ASSERT(c->misses    == 3, "misses == 3");
@@ -113,10 +113,10 @@ static void test_all_hits_after_warmup(void)
 
     /* All subsequent accesses to same set should hit */
     int r;
-    r = lru_access(c, 0xA); ASSERT(r == CACHE_HIT, "0xA → HIT after warmup");
-    r = lru_access(c, 0xB); ASSERT(r == CACHE_HIT, "0xB → HIT after warmup");
-    r = lru_access(c, 0xC); ASSERT(r == CACHE_HIT, "0xC → HIT after warmup");
-    r = lru_access(c, 0xD); ASSERT(r == CACHE_HIT, "0xD → HIT after warmup");
+    r = lru_access(c, 0xA); ASSERT(r == CACHE_HIT, "0xA -> HIT after warmup");
+    r = lru_access(c, 0xB); ASSERT(r == CACHE_HIT, "0xB -> HIT after warmup");
+    r = lru_access(c, 0xC); ASSERT(r == CACHE_HIT, "0xC -> HIT after warmup");
+    r = lru_access(c, 0xD); ASSERT(r == CACHE_HIT, "0xD -> HIT after warmup");
 
     ASSERT(c->hits      == 4, "hits == 4");
     ASSERT(c->evictions == 0, "no evictions during hit-only phase");
@@ -136,25 +136,27 @@ static void test_lru_order(void)
     lru_access(c, 3);   /* cache: [3,2,1]   */
     lru_access(c, 1);   /* cache: [1,3,2]  — 1 promoted to MRU */
     lru_access(c, 4);   /* cache: [4,1,3]  — 2 evicted (LRU tail) */
+    lru_access(c, 1);   /* cache: [1,3,2]  - 1 promoted to MRU */
+    lru_access(c, 4);   /* cache: [4,1,3]  - 2 evicted (LRU tail) */
 
-    /* Now access 2 — should be a miss since it was evicted.
-     * Trace: [1,2,3] → access 1 → [1,3,2] → access 4 (evicts 2) → [4,1,3]
-     *        → access 2 (evicts 3) → [2,4,1]
+    /* Now access 2 - should be a miss since it was evicted.
+     * Trace: [1,2,3] -> access 1 -> [1,3,2] -> access 4 (evicts 2) -> [4,1,3]
+     *        -> access 2 (evicts 3) -> [2,4,1]
      * So 2 was evicted by step 4, then re-loaded in this access. */
     int r = lru_access(c, 2);
-    ASSERT(r == CACHE_MISS, "2 → MISS (was evicted after 4 was inserted)");
-
+    ASSERT(r == CACHE_MISS, "2 -> MISS (was evicted after 4 was inserted)");
+ 
     /* 1 was re-promoted when we accessed it, so it's still in cache */
-    r = lru_access(c, 1); ASSERT(r == CACHE_HIT, "1 → HIT (was re-promoted to MRU)");
-
+    r = lru_access(c, 1); ASSERT(r == CACHE_HIT, "1 -> HIT (was re-promoted to MRU)");
+ 
     /* 3 was the LRU tail when 2 was re-inserted, so 3 got evicted */
-    r = lru_access(c, 3); ASSERT(r == CACHE_MISS, "3 → MISS (was evicted as LRU tail when 2 loaded)");
+    r = lru_access(c, 3); ASSERT(r == CACHE_MISS, "3 -> MISS (was evicted as LRU tail when 2 loaded)");
 
     lru_print_stats(c);
     lru_destroy(c);
 }
 
-/* ─── Test 5: Large sequence — hit rate smoke test ───────────────── */
+/* ─── Test 5: Large sequence - hit rate smoke test ───────────────── */
 static void test_large_sequence(void)
 {
     printf("\n=== Test 5: Large working-set smoke test ===\n");
@@ -184,7 +186,7 @@ static void test_large_sequence(void)
 int main(void)
 {
     printf("============================================\n");
-    printf("  LRU Cache Unit Tests — Day 4\n");
+    printf("  LRU Cache Unit Tests - Day 4\n");
     printf("  CPU Cache Replacement Simulator\n");
     printf("============================================\n");
 
