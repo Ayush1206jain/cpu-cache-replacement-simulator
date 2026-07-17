@@ -19,13 +19,15 @@ SRC_CACHE = src/cache/lru.c src/cache/fifo.c src/cache/lfu.c \
             src/cache/cache.c src/cache/set_cache.c
 SRC_SIM   = src/trace.c src/simulator.c
 SRC_MULTI = src/multi_cache.c
+SRC_MESI  = src/mesi.c
+SRC_BENCH = src/workload.c src/benchmark.c
 SRC_MAIN  = src/main.c
 
 .PHONY: all test test4 test5 test6 test7 run clean
 
 all: simulator
 
-simulator: $(SRC_MAIN) $(SRC_CACHE) $(SRC_SIM) $(SRC_MULTI)
+simulator: $(SRC_MAIN) $(SRC_CACHE) $(SRC_SIM) $(SRC_MULTI) $(SRC_MESI) $(SRC_BENCH)
 	$(CC) $(CFLAGS) $(IFLAGS) -o simulator $^ -lm
 	@echo "Built: simulator"
 
@@ -54,12 +56,22 @@ test8: tests/test_day8.c $(SRC_CACHE) $(SRC_SIM) $(SRC_MULTI)
 	@echo "Running Day 8 Multi-Level Cache + AMAT tests..."
 	.\test_day8.exe
 
-test: test4 test5 test6 test7 test8
+test9: tests/test_day9.c $(SRC_MESI)
+	$(CC) $(CFLAGS) $(IFLAGS) -o test_day9 $^
+	@echo "Running Day 9 MESI Coherence Protocol tests..."
+	.\test_day9.exe
+
+test11: tests/test_day11.c $(SRC_CACHE) $(SRC_BENCH)
+	$(CC) $(CFLAGS) $(IFLAGS) -o test_day11 $^ -lm
+	@echo "Running Day 11 Benchmark tests..."
+	.\test_day11.exe
+
+test: test4 test5 test6 test7 test8 test9 test11
 	@echo "All tests complete."
 
 run: simulator
 	.\simulator.exe
 
 clean:
-	del /Q simulator.exe test_lru.exe test_day5.exe test_day6.exe test_day7.exe test_day8.exe 2>nul || true
+	del /Q simulator.exe test_lru.exe test_day5.exe test_day6.exe test_day7.exe test_day8.exe test_day9.exe test_day11.exe 2>nul || true
 	@echo "Cleaned."
