@@ -8,7 +8,7 @@
  * This is sufficient to demonstrate all MESI transitions;
  * associativity would add complexity without new protocol insight.
  *
- * Day 9 -- CPU Cache Replacement Simulator
+ *   CPU Cache Replacement Simulator
  */
 
 #include "mesi.h"
