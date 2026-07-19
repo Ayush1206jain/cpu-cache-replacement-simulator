@@ -8,7 +8,7 @@
  *         set_cache_access(cache, addr)
  *     record hits, misses, hit_rate
  *
- * Day 11 -- CPU Cache Replacement Simulator
+ *  -- CPU Cache Replacement Simulator
  */
 
 #include "benchmark.h"
@@ -71,7 +71,7 @@ BenchReport benchmark_run(int default_size_kb)
     rep.n_accesses      = BENCH_N_ACCESSES;
     rep.seed            = BENCH_SEED;
 
-    /* Build all 4 workloads once -- reuse across all policy/size runs */
+    /* Build 2 workloads once -- reuse across all policy/size runs */
     Workload *wl = workload_build_all(BENCH_N_ACCESSES, BENCH_SEED);
     if (!wl) {
         fprintf(stderr, "[bench] workload_build_all failed\n");
@@ -82,7 +82,7 @@ BenchReport benchmark_run(int default_size_kb)
         POLICY_LRU, POLICY_FIFO, POLICY_LFU
     };
 
-    /* ---- 4x4 Policy matrix (fixed default size, all policies) ---- */
+    /* ---- 3x2 Policy matrix (fixed default size, all policies) ---- */
     printf("[bench] Running policy matrix (%dKB, %d-way) ...\n",
            default_size_kb, BENCH_N_WAYS);
     for (int p = 0; p < BENCH_N_POLICIES; p++) {
@@ -93,7 +93,7 @@ BenchReport benchmark_run(int default_size_kb)
         }
     }
 
-    /* ---- 4x4 Size matrix (LRU only, all workloads) ---- */
+    /* ---- 4x2 Size matrix (LRU only, sequential + random) ---- */
     printf("[bench] Running size sweep (LRU) ...\n");
     for (int s = 0; s < BENCH_N_SIZES; s++) {
         int kb = BENCH_SIZES_KB[s];
@@ -103,7 +103,7 @@ BenchReport benchmark_run(int default_size_kb)
         }
     }
 
-    workload_free_all(wl, 4);
+    workload_free_all(wl, 2);
     return rep;
 }
 
@@ -113,31 +113,25 @@ BenchReport benchmark_run(int default_size_kb)
 void benchmark_print_policy_matrix(const BenchReport *r)
 {
     static const char *pnames[BENCH_N_POLICIES] = {"LRU", "FIFO", "LFU"};
-    static const char *wnames[BENCH_N_WORKLOADS] = {
-        "Sequential", "Random", "Zipfian", "Mixed"
-    };
 
     printf("\n");
-    printf("=================================================================\n");
-    printf("  Policy vs Workload Hit Rate (%%)                              \n");
-    printf("  Cache: %dKB, %d-way, %dB lines, %d accesses                  \n",
+    printf("=================================================\n");
+    printf("  Policy vs Workload Hit Rate (%%)              \n");
+    printf("  Cache: %dKB, %d-way, %dB lines, %d accesses  \n",
            r->default_size_kb, r->default_ways,
            BENCH_LINE_SIZE, (int)r->n_accesses);
-    printf("=================================================================\n");
-    printf("  %-6s | %-12s | %-8s | %-8s | %-8s\n",
-           "Policy", "Sequential", "Random", "Zipfian", "Mixed");
-    printf("  -------------------------------------------------------\n");
+    printf("=================================================\n");
+    printf("  %-6s | %-12s | %-10s\n",
+           "Policy", "Sequential", "Random");
+    printf("  ------------------------------------\n");
 
     for (int p = 0; p < BENCH_N_POLICIES; p++) {
-        printf("  %-6s | %11.2f%% | %7.2f%% | %7.2f%% | %7.2f%%\n",
+        printf("  %-6s | %11.2f%% | %9.2f%%\n",
                pnames[p],
-               r->policy_matrix[p][0].hit_rate,
-               r->policy_matrix[p][1].hit_rate,
-               r->policy_matrix[p][2].hit_rate,
-               r->policy_matrix[p][3].hit_rate);
+               r->policy_matrix[p][0].hit_rate,   /* Sequential */
+               r->policy_matrix[p][1].hit_rate);  /* Random     */
     }
-    printf("=================================================================\n");
-    (void)wnames;
+    printf("=================================================\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -146,24 +140,22 @@ void benchmark_print_policy_matrix(const BenchReport *r)
 void benchmark_print_size_matrix(const BenchReport *r)
 {
     printf("\n");
-    printf("=================================================================\n");
-    printf("  Cache Size vs Workload Hit Rate (%%) -- LRU Policy            \n");
-    printf("  %d-way, %dB lines, %d accesses                               \n",
+    printf("=================================================\n");
+    printf("  Cache Size vs Workload Hit Rate (%%) -- LRU   \n");
+    printf("  %d-way, %dB lines, %d accesses                \n",
            r->default_ways, BENCH_LINE_SIZE, (int)r->n_accesses);
-    printf("=================================================================\n");
-    printf("  %-8s | %-12s | %-8s | %-8s | %-8s\n",
-           "Size", "Sequential", "Random", "Zipfian", "Mixed");
-    printf("  ---------------------------------------------------------\n");
+    printf("=================================================\n");
+    printf("  %-8s | %-12s | %-10s\n",
+           "Size", "Sequential", "Random");
+    printf("  ------------------------------------\n");
 
     for (int s = 0; s < BENCH_N_SIZES; s++) {
-        printf("  %-7dKB | %11.2f%% | %7.2f%% | %7.2f%% | %7.2f%%\n",
+        printf("  %-7dKB | %11.2f%% | %9.2f%%\n",
                BENCH_SIZES_KB[s],
-               r->size_matrix[s][0].hit_rate,
-               r->size_matrix[s][1].hit_rate,
-               r->size_matrix[s][2].hit_rate,
-               r->size_matrix[s][3].hit_rate);
+               r->size_matrix[s][0].hit_rate,   /* Sequential */
+               r->size_matrix[s][1].hit_rate);  /* Random     */
     }
-    printf("=================================================================\n");
+    printf("=================================================\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -179,42 +171,28 @@ void benchmark_write_csv(const BenchReport *r, const char *path)
     }
 
     static const char *pnames[BENCH_N_POLICIES] = {"LRU", "FIFO", "LFU"};
-    static const char *wnames[BENCH_N_WORKLOADS] = {
-        "Sequential", "Random", "Zipfian", "Mixed"
-    };
 
     /* --- Section 1: Policy matrix --- */
-    fprintf(f, "# Section 1: Policy vs Workload (cache=%dKB %d-way)\n",
-            r->default_size_kb, r->default_ways);
-    fprintf(f, "section,policy,workload,hits,misses,total,hit_rate\n");
+    fprintf(f, "# Policy vs Workload (cache=%dKB %d-way %d accesses)\n",
+            r->default_size_kb, r->default_ways, (int)r->n_accesses);
+    fprintf(f, "policy,sequential_hit_rate,random_hit_rate\n");
 
     for (int p = 0; p < BENCH_N_POLICIES; p++) {
-        for (int w = 0; w < BENCH_N_WORKLOADS; w++) {
-            const BenchResult *br = &r->policy_matrix[p][w];
-            fprintf(f, "policy_matrix,%s,%s,%llu,%llu,%llu,%.4f\n",
-                    pnames[p], wnames[w],
-                    (unsigned long long)br->hits,
-                    (unsigned long long)br->misses,
-                    (unsigned long long)br->total,
-                    br->hit_rate);
-        }
+        fprintf(f, "%s,%.4f,%.4f\n",
+                pnames[p],
+                r->policy_matrix[p][0].hit_rate,   /* Sequential */
+                r->policy_matrix[p][1].hit_rate);  /* Random     */
     }
 
     /* --- Section 2: Size sweep (LRU) --- */
-    fprintf(f, "\n# Section 2: LRU Cache Size Sweep\n");
-    fprintf(f, "section,policy,workload,size_kb,hits,misses,total,hit_rate\n");
+    fprintf(f, "\n# LRU Cache Size Sweep\n");
+    fprintf(f, "size_kb,sequential_hit_rate,random_hit_rate\n");
 
     for (int s = 0; s < BENCH_N_SIZES; s++) {
-        for (int w = 0; w < BENCH_N_WORKLOADS; w++) {
-            const BenchResult *br = &r->size_matrix[s][w];
-            fprintf(f, "size_sweep,LRU,%s,%d,%llu,%llu,%llu,%.4f\n",
-                    wnames[w],
-                    BENCH_SIZES_KB[s],
-                    (unsigned long long)br->hits,
-                    (unsigned long long)br->misses,
-                    (unsigned long long)br->total,
-                    br->hit_rate);
-        }
+        fprintf(f, "%d,%.4f,%.4f\n",
+                BENCH_SIZES_KB[s],
+                r->size_matrix[s][0].hit_rate,   /* Sequential */
+                r->size_matrix[s][1].hit_rate);  /* Random     */
     }
 
     fclose(f);

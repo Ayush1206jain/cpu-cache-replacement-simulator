@@ -1,13 +1,13 @@
 /*
  * benchmark.h -- Cache Benchmarking Engine
  *
- * Runs all 4 policies across all 4 workloads and all 4 cache sizes.
+ * Runs all 3 policies across 2 workloads and all 4 cache sizes.
  * Produces:
- *   1. 4x4 policy-vs-workload hit-rate matrix (stdout table)
- *   2. 4x4 size-vs-workload hit-rate matrix for LRU (stdout table)
- *   3. results.csv with ALL data for Python plotting
+ *   1. 3x2 policy-vs-workload hit-rate matrix (stdout table)
+ *   2. 4x2 size-vs-workload hit-rate matrix for LRU (stdout table)
+ *   3. results.csv with headers: policy, sequential_hit_rate, random_hit_rate
  *
- * Day 11 -- CPU Cache Replacement Simulator
+ *  -- CPU Cache Replacement Simulator
  */
 
 #ifndef BENCHMARK_H
@@ -24,7 +24,7 @@
 #define BENCH_N_ACCESSES   10000   /* accesses per run (keep fast)    */
 #define BENCH_SEED         42      /* reproducible random seed         */
 #define BENCH_N_POLICIES   3       /* LRU, FIFO, LFU                  */
-#define BENCH_N_WORKLOADS  4       /* Sequential, Random, Zipf, Mixed  */
+#define BENCH_N_WORKLOADS  2       /* Sequential, Random               */
 #define BENCH_N_SIZES      4       /* 1KB, 4KB, 16KB, 64KB            */
 #define BENCH_N_WAYS       4       /* associativity for all runs       */
 #define BENCH_LINE_SIZE    64      /* cache line size in bytes         */
@@ -46,10 +46,10 @@ typedef struct {
 /* Full benchmark results                                               */
 /* ------------------------------------------------------------------ */
 typedef struct {
-    /* 4x4 policy vs workload matrix [policy][workload] at default size */
+    /* 3x2 policy vs workload matrix [policy][workload] at default size */
     BenchResult policy_matrix[BENCH_N_POLICIES][BENCH_N_WORKLOADS];
 
-    /* 4x4 cache size vs workload matrix [size][workload] for LRU */
+    /* 4x2 cache size vs workload matrix [size][workload] for LRU */
     BenchResult size_matrix[BENCH_N_SIZES][BENCH_N_WORKLOADS];
 
     /* Metadata */
