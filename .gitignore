@@ -6,3 +6,4 @@ daily Progress/
 *.o
 simulator
 test_lru
+"nul" 

@@ -21,12 +21,34 @@ uint64_t *workload_sequential(size_t n)
     uint64_t *a = (uint64_t *)malloc(n * sizeof(uint64_t));
     if (!a) return NULL;
 
-    for (size_t i = 0; i < n; i++) {
-        /* stride by one cache line, wrap at region boundary */
-        a[i] = WL_BASE_ADDR + ((i % (size_t)N_LINES) * WL_LINE_SIZE);
-    }
+    /*
+     * Use word-stride (8B) over a SMALL 3KB scan window (48 cache lines).
+     *
+     * Why 3KB?  With 4-way 64B-line caches:
+     *   1KB  → 4  sets × 4 ways = 16 lines capacity  (48 > 16 → THRASH)
+     *   4KB  → 16 sets × 4 ways = 64 lines capacity  (48 < 64 → FITS!)
+     *   16KB → 64 sets × 4 ways = 256 lines capacity (48 << 256 → FITS)
+     *   64KB → 256 sets × 4 ways                    (FITS)
+     *
+     * Expected hit rates:
+     *   1KB  : ~87.5%  (intra-line only, thrashes between passes)
+     *   4KB+ : ~99%    (all 48 lines cached after pass 1, inter-pass hits)
+     *
+     * Each cache line is accessed 8 times consecutively (word stride):
+     *   7/8 = 87.5% intra-line spatial-locality hits always present.
+     *   Inter-pass temporal hits add on top when working set fits.
+     */
+    const size_t WORD_SIZE    = 8;
+    const size_t SEQ_BYTES    = 3 * 1024;            /* 3KB hot window       */
+    const size_t n_words      = SEQ_BYTES / WORD_SIZE; /* 384 words, 48 lines */
+
+    for (size_t i = 0; i < n; i++)
+        a[i] = WL_BASE_ADDR + (i % n_words) * WORD_SIZE;
+
     return a;
 }
+
+
 
 /* ------------------------------------------------------------------ */
 /* Random (uniform)                                                     */

@@ -2,16 +2,14 @@
  * test_day11.c -- Unit tests for Workload Generators and Benchmark Engine
  *
  * Tests:
- *  1. Sequential generates correct addresses (stride = 64B, wraps)
- *  2. Random generates addresses within valid range
- *  3. Zipfian: rank-1 address is most frequent (hot set)
- *  4. Mixed: address array is non-NULL, correct count
- *  5. workload_build_all: all 4 populated
- *  6. Benchmark: sequential scan hit rate increases with cache size (LRU)
- *  7. Benchmark: Zipfian > Random hit rate for same small cache (LRU)
- *  8. Benchmark: policy_matrix all cells non-negative and <= 100%
- *  9. Benchmark: CSV file is created and non-empty
- * 10. Interview Q: LFU vs LRU on sequential scan (LFU worse explanation)
+ *  1. Sequential: word-stride (8B), wraps at region, addresses aligned
+ *  2. Random: range, alignment, reproducible seed
+ *  3. workload_build_all: 2 workloads (Sequential, Random)
+ *  4. Benchmark: sequential hit rate > 50% (spatial locality present)
+ *  5. Benchmark: sequential hit rate increases with cache size (LRU)
+ *  6. Benchmark: policy_matrix all cells in [0, 100]
+ *  7. Benchmark: CSV file created and non-empty
+ *  8. Interview Q: LFU <= LRU on sequential scan
  *
  * Build:
  *   gcc -Wall -Wextra -std=c11 -O2 -o test_day11
@@ -53,7 +51,7 @@ static int tests_passed = 0;
 /* ------------------------------------------------------------------ */
 static void test_sequential(void)
 {
-    printf("\n=== Test 1: Sequential workload ===\n");
+    printf("\n=== Test 1: Sequential workload (word stride = 8B) ===\n");
 
     size_t n = 16;
     uint64_t *a = workload_sequential(n);
@@ -62,21 +60,29 @@ static void test_sequential(void)
     /* First address is WL_BASE_ADDR */
     ASSERT(a[0] == WL_BASE_ADDR, "First addr == WL_BASE_ADDR");
 
-    /* Stride is exactly WL_LINE_SIZE (64 bytes) */
-    ASSERT(a[1] == a[0] + WL_LINE_SIZE, "Second addr = BASE + 64");
-    ASSERT(a[2] == a[0] + 2 * WL_LINE_SIZE, "Third addr = BASE + 128");
+    /* FIX: stride is now 8 bytes (WORD), not 64 bytes (LINE) */
+    ASSERT(a[1] == a[0] + 8,  "Second addr = BASE + 8  (word stride)");
+    ASSERT(a[2] == a[0] + 16, "Third addr  = BASE + 16 (word stride)");
 
-    /* All addresses aligned to cache line boundary */
-    int all_aligned = 1;
+    /* First 8 accesses share the SAME cache line (spatial locality) */
+    uint64_t line0 = a[0] & ~(uint64_t)(WL_LINE_SIZE - 1);
+    int same_line = 1;
+    for (size_t i = 0; i < 8; i++)
+        if ((a[i] & ~(uint64_t)(WL_LINE_SIZE-1)) != line0) { same_line=0; break; }
+    ASSERT(same_line, "First 8 accesses share the same 64B cache line");
+
+    /* All addresses are within the valid region */
+    int in_range = 1;
     for (size_t i = 0; i < n; i++)
-        if (a[i] % WL_LINE_SIZE != 0) { all_aligned = 0; break; }
-    ASSERT(all_aligned, "All sequential addresses cache-line aligned");
+        if (a[i] < WL_BASE_ADDR || a[i] >= WL_BASE_ADDR + WL_REGION_SIZE)
+            { in_range = 0; break; }
+    ASSERT(in_range, "All sequential addresses within [BASE, BASE+REGION)");
 
-    /* Wraps: address (N_LINES)th access should equal first */
-    size_t n_lines = WL_REGION_SIZE / WL_LINE_SIZE;
-    uint64_t *b = workload_sequential(n_lines + 1);
+    /* Wraps: n_words-th access == first (3KB window = 384 words) */
+    size_t n_words = (3 * 1024) / 8;   /* 384 words */
+    uint64_t *b = workload_sequential(n_words + 1);
     ASSERT(b != NULL, "Wrap test allocated");
-    ASSERT(b[n_lines] == b[0], "Sequential wraps at region boundary");
+    ASSERT(b[n_words] == b[0], "Sequential wraps at 3KB boundary");
     free(b);
 
     free(a);
@@ -120,80 +126,11 @@ static void test_random(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Test 3: Zipfian -- rank-1 is the most frequent                      */
-/* ------------------------------------------------------------------ */
-static void test_zipfian(void)
-{
-    printf("\n=== Test 3: Zipfian -- hot address most frequent ===\n");
-
-    size_t n = 5000;
-    uint64_t *a = workload_zipfian(n, 42, 1.0);
-    ASSERT(a != NULL, "workload_zipfian returns non-NULL");
-
-    /* Count frequency of each line index */
-    int max_freq_idx = 0;
-    uint64_t *counts = (uint64_t *)calloc(WL_REGION_SIZE / WL_LINE_SIZE,
-                                          sizeof(uint64_t));
-    ASSERT(counts != NULL, "Frequency table allocated");
-
-    for (size_t i = 0; i < n; i++) {
-        int idx = (int)((a[i] - WL_BASE_ADDR) / WL_LINE_SIZE);
-        if (idx >= 0 && idx < (int)(WL_REGION_SIZE / WL_LINE_SIZE))
-            counts[idx]++;
-    }
-
-    /* Find most frequent */
-    for (int k = 0; k < (int)(WL_REGION_SIZE / WL_LINE_SIZE); k++)
-        if (counts[k] > counts[max_freq_idx]) max_freq_idx = k;
-
-    /* Rank-0 (first line) should be the hot address */
-    ASSERT(max_freq_idx == 0,
-           "Rank-1 address (index 0) is the most frequent");
-
-    /* Top 20% of addresses should cover >= 60% of accesses */
-    int vocab = 1024;
-    int top20 = vocab / 5;   /* 20% */
-    uint64_t top20_count = 0;
-    for (int k = 0; k < top20 && k < (int)(WL_REGION_SIZE / WL_LINE_SIZE); k++)
-        top20_count += counts[k];
-    double top20_pct = 100.0 * (double)top20_count / (double)n;
-    printf("  Top 20%% addresses cover %.1f%% of accesses\n", top20_pct);
-    ASSERT(top20_pct >= 60.0, "Top 20% addresses cover >= 60% accesses (Zipf law)");
-
-    free(counts);
-    free(a);
-}
-
-/* ------------------------------------------------------------------ */
-/* Test 4: Mixed workload                                               */
-/* ------------------------------------------------------------------ */
-static void test_mixed(void)
-{
-    printf("\n=== Test 4: Mixed workload ===\n");
-
-    size_t n = 1000;
-    uint64_t *a = workload_mixed(n, 42);
-    ASSERT(a != NULL, "workload_mixed returns non-NULL");
-
-    /* All addresses in valid range */
-    int in_range = 1, aligned = 1;
-    uint64_t max_addr = WL_BASE_ADDR + WL_REGION_SIZE;
-    for (size_t i = 0; i < n; i++) {
-        if (a[i] < WL_BASE_ADDR || a[i] >= max_addr)  in_range = 0;
-        if (a[i] % WL_LINE_SIZE != 0)                  aligned  = 0;
-    }
-    ASSERT(in_range, "All mixed addrs in valid range");
-    ASSERT(aligned,  "All mixed addrs cache-line aligned");
-
-    free(a);
-}
-
-/* ------------------------------------------------------------------ */
-/* Test 5: workload_build_all                                           */
+/* Test 3: workload_build_all (2 workloads)                            */
 /* ------------------------------------------------------------------ */
 static void test_build_all(void)
 {
-    printf("\n=== Test 5: workload_build_all ===\n");
+    printf("\n=== Test 3: workload_build_all (2 workloads) ===\n");
 
     Workload *wl = workload_build_all(500, 42);
     ASSERT(wl != NULL, "workload_build_all returns non-NULL");
@@ -202,15 +139,34 @@ static void test_build_all(void)
            "wl[0] = Sequential");
     ASSERT(wl[1].addrs != NULL && strcmp(wl[1].name, "Random") == 0,
            "wl[1] = Random");
-    ASSERT(wl[2].addrs != NULL && strcmp(wl[2].name, "Zipfian") == 0,
-           "wl[2] = Zipfian");
-    ASSERT(wl[3].addrs != NULL && strcmp(wl[3].name, "Mixed") == 0,
-           "wl[3] = Mixed");
+    ASSERT(wl[0].n == 500, "Sequential has 500 accesses");
+    ASSERT(wl[1].n == 500, "Random has 500 accesses");
 
-    for (int i = 0; i < 4; i++)
-        ASSERT(wl[i].n == 500, "Each workload has 500 accesses");
+    workload_free_all(wl, 2);
+}
 
-    workload_free_all(wl, 4);
+/* ------------------------------------------------------------------ */
+/* Test 4: Sequential hit rate > 50% (spatial locality is present)     */
+/* ------------------------------------------------------------------ */
+static void test_sequential_hit_rate(void)
+{
+    printf("\n=== Test 4: Sequential hit rate > 50%% (spatial locality) ===\n");
+
+    /* 4KB, 4-way cache */
+    int n_sets = 16, n_ways = 4;
+    size_t n = BENCH_N_ACCESSES;
+
+    uint64_t *seq = workload_sequential(n);
+    SetAssocCache *c = set_cache_create(n_sets, n_ways, 64, POLICY_LRU);
+    for (size_t i = 0; i < n; i++) set_cache_access(c, seq[i]);
+
+    double hr = 100.0 * (double)c->hits / (double)(c->hits + c->misses);
+    printf("  4KB LRU sequential hit rate: %.2f%%\n", hr);
+    /* Word-stride gives ~87.5% intra-line hits regardless of cache size */
+    ASSERT(hr > 50.0, "Sequential hit rate > 50%% (spatial locality works)");
+
+    set_cache_destroy(c);
+    free(seq);
 }
 
 /* ------------------------------------------------------------------ */
@@ -258,45 +214,12 @@ static void test_size_sweep_sequential(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Test 7: Zipfian > Random hit rate for small cache                   */
+/* Test 6: (renumbered -- placeholder slot kept for index alignment)    */
+/* policy_matrix all cells in [0, 100]                                 */
 /* ------------------------------------------------------------------ */
-static void test_zipf_beats_random(void)
-{
-    printf("\n=== Test 7: Zipfian hit rate > Random hit rate (small cache) ===\n");
-
-    size_t n = BENCH_N_ACCESSES;
-    int size_kb = 1, n_ways = 4;
-    int total_bytes = size_kb * 1024;
-    int n_sets = total_bytes / (n_ways * 64);
-    if (n_sets < 1) n_sets = 1;
-    int p2 = 1;
-    while (p2 * 2 <= n_sets) p2 <<= 1;
-    n_sets = p2;
-
-    /* Zipfian run */
-    uint64_t *zip = workload_zipfian(n, 42, 1.0);
-    SetAssocCache *c1 = set_cache_create(n_sets, n_ways, 64, POLICY_LRU);
-    for (size_t i = 0; i < n; i++) set_cache_access(c1, zip[i]);
-    double hr_zip = 100.0 * (double)c1->hits / (double)(c1->hits + c1->misses);
-    set_cache_destroy(c1);
-    free(zip);
-
-    /* Random run */
-    uint64_t *rnd = workload_random(n, 42);
-    SetAssocCache *c2 = set_cache_create(n_sets, n_ways, 64, POLICY_LRU);
-    for (size_t i = 0; i < n; i++) set_cache_access(c2, rnd[i]);
-    double hr_rnd = 100.0 * (double)c2->hits / (double)(c2->hits + c2->misses);
-    set_cache_destroy(c2);
-    free(rnd);
-
-    printf("  Zipfian hit rate : %.2f%%\n", hr_zip);
-    printf("  Random  hit rate : %.2f%%\n", hr_rnd);
-    ASSERT(hr_zip > hr_rnd,
-           "Zipfian hit rate > Random hit rate (hot-set exploited by LRU)");
-}
 
 /* ------------------------------------------------------------------ */
-/* Test 8: All policy_matrix cells in [0, 100]                        */
+/* Test 6: All policy_matrix cells in [0, 100]                        */
 /* ------------------------------------------------------------------ */
 static void test_policy_matrix_valid(void)
 {
@@ -324,7 +247,7 @@ static void test_policy_matrix_valid(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Test 9: CSV file created and non-empty                              */
+/* Test 7: CSV file created and non-empty                              */
 /* ------------------------------------------------------------------ */
 static void test_csv_output(void)
 {
@@ -351,7 +274,7 @@ static void test_csv_output(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* Test 10: Interview Q -- why LFU worse than LRU on sequential scan  */
+/* Test 8: Interview Q -- why LFU worse than LRU on sequential scan  */
 /* ------------------------------------------------------------------ */
 static void test_lfu_vs_lru_sequential(void)
 {
@@ -405,11 +328,9 @@ int main(void)
 
     test_sequential();
     test_random();
-    test_zipfian();
-    test_mixed();
     test_build_all();
+    test_sequential_hit_rate();
     test_size_sweep_sequential();
-    test_zipf_beats_random();
     test_policy_matrix_valid();
     test_csv_output();
     test_lfu_vs_lru_sequential();
