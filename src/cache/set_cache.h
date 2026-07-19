@@ -18,7 +18,7 @@
  *   index_bits  = 4   (log2 16)
  *   tag_bits    = 54  (64 - 6 - 4)
  *
- * Day 6 — CPU Cache Replacement Simulator
+ *  CPU Cache Replacement Simulator
  */
 
 #ifndef SET_CACHE_H

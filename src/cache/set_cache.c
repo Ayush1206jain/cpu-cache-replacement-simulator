@@ -17,7 +17,7 @@
  *   [index_bits]  → selects which set to look in
  *   [remaining]   → tag, stored in the cache line for comparison
  *
- * Day 6 — CPU Cache Replacement Simulator
+ *  CPU Cache Replacement Simulator
  */
 
 #include "set_cache.h"
