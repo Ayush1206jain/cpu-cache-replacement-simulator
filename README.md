@@ -81,7 +81,7 @@ style GRAPH fill:#D6EAF8,stroke:#2874A6,stroke-width:2px,color:#000
 | **C (C11)** | gcc 11+ | Direct memory control for implementing pointer-based data structures (linked lists, hash maps) that model hardware eviction logic without GC overhead |
 | **Python 3 + matplotlib** | 3.10+ | Rapid post-processing of CSV benchmark output into publication-quality charts without adding C build complexity |
 | **Valgrind / Cachegrind** | 3.18+ | Industry-standard tool for generating real memory access traces from running programs, used to validate the trace parser |
-| **Make** | GNU Make | Reproducible multi-target builds with separate test targets per implementation day |
+| **Make** | GNU Make |
 
 ---
 
@@ -106,7 +106,7 @@ cpu-cache-simulator/
 │       ├── lfu.c / .h              # LFU — frequency buckets with LRU tie-break
 │       └── set_cache.c / .h        # N-way set-associative cache (tag/index/offset)
 │
-├── tests/                          # Unit test suites (one per module / day)
+├── tests/                          # Unit test suites 
 │   ├── test_lru.c                  # LRU linked-list eviction order tests
 │   ├── test_fifo_lfu.c             # FIFO + LFU correctness tests
 │   ├── test_Nway_set_asso.c        # Set-associative address decode tests
@@ -125,8 +125,6 @@ cpu-cache-simulator/
 │   ├── policy_comparison.png       # Bar chart: hit rate by policy × workload
 │   └── cache_size_sensitivity.png  # Line chart: LRU hit rate vs cache size
 │
-├── plan/
-│   └── cache_simulator_plan.md     # 12-day implementation plan
 │
 ├── plot_results.py                 # Reads results.csv → generates 2 PNG charts
 ├── Makefile                        # Build: make / make test / make test11 / make clean
@@ -158,7 +156,7 @@ gcc -Wall -Wextra -std=c11 -g -fsanitize=address \
 # Or use the Makefile (recommended)
 make            # builds simulator
 make test       # compiles and runs all 7 test suites
-make test11     # runs Day 11 benchmark + workload tests only
+make test11     # runs  benchmark + workload tests only
 make clean      # removes all compiled binaries
 ```
 
@@ -269,6 +267,13 @@ size_kb,sequential_hit_rate,random_hit_rate
 | 64 KB | 99.52% | 94.88% |
 
 > Sequential hits the working-set inflection point at 4KB (working set = 3KB fits); Random scales linearly with cache capacity relative to the 32KB address space, converging toward 100% at 64KB.
+
+
+### Cache Hit Rate by Policy and Workload Type
+![Policy Comparison](results/policy_comparison.png)
+
+### LRU Hit Rate vs Cache Size
+![Cache Size Sensitivity](results/cache_size_sensitivity.png)
 
 ---
 
