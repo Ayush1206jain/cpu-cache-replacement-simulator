@@ -1,9 +1,30 @@
-# Personal study notes — not for public repo
-daily Progress/
-
-# Build artifacts
+# ── Build artifacts ─────────────────────────────────────────────────
 *.exe
 *.o
+*.out
 simulator
 test_lru
-"nul" 
+test_day5
+test_day6
+test_day7
+test_day8
+test_day9
+test_day11
+
+# ── Windows junk ─────────────────────────────────────────────────────
+nul
+Thumbs.db
+desktop.ini
+
+# ── IDE / editor ─────────────────────────────────────────────────────
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ── Python cache ─────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+
+# ── Test-only benchmark output (keep results/results.csv + PNGs) ─────
+results/test_results.csv

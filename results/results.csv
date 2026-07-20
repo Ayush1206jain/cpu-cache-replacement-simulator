@@ -1,0 +1,12 @@
+# Policy vs Workload (cache=4KB 4-way 10000 accesses)
+policy,sequential_hit_rate,random_hit_rate
+LRU,99.5200,12.6700
+FIFO,99.5200,12.5600
+LFU,99.5200,12.2400
+
+# LRU Cache Size Sweep
+size_kb,sequential_hit_rate,random_hit_rate
+1,87.5000,3.1000
+4,99.5200,12.6700
+16,99.5200,49.2300
+64,99.5200,94.8800
